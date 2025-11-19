@@ -12,14 +12,14 @@ const app = express();
 const port = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-const sessionStore = new MySQLStore({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT || 3306,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-});
-
+// const sessionStore = new MySQLStore({
+//   host: process.env.DB_HOST,
+//   port: process.env.DB_PORT || 3306,
+//   user: process.env.DB_USER,
+//   password: process.env.DB_PASSWORD,
+//   database: process.env.DB_NAME,
+// });
+const sessionStore = new MySQLStore({}, db.promise());
 // JSON 요청 바디 파싱
 app.use(express.json());
 
@@ -514,5 +514,5 @@ app.get('/notes/:noteID/likes/count', (req, res) => {
 
 // ------------------------ 서버 시작 ------------------------
 app.listen(port, () => {
-  console.log(`API Server running on http://localhost:${port}`);
+  console.log(`API Server running on port:${port}`);
 });
