@@ -36,7 +36,7 @@ function createPool() {
 
 createPool();
 
-// (선택) Keep-Alive Ping – Railway Sleep 감소
+// Keep-Alive Ping – Railway Sleep 감소
 setInterval(() => {
   pool.query('SELECT 1', (err) => {
     if (err) {

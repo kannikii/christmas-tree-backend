@@ -37,10 +37,12 @@ passport.use(new GoogleStrategy(
     const selectSql = 'SELECT * FROM user WHERE email = ?';
     db.query(selectSql, [email], (err, results) => {
       if (err) return done(err);
+      // 이미 등록한 경우
       if (results.length > 0) {
         return done(null, results[0]);
       }
 
+      // 처음 이용하는 경우 사용자 등록 (구글)
       const insertSql = `
         INSERT INTO user (username, email, password, provider)
         VALUES (?, ?, ?, 'google')
