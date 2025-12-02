@@ -49,4 +49,57 @@ router.get('/:noteID/comments', (req, res) => {
   });
 });
 
+//댓글 수정
+router.put('/:noteID/comments/:commentID', (req, res) => {
+  const { noteID, commentID } = req.params;
+  const { userID, content } = req.body;
+  if (!userID) {
+    return res.status(400).send('user_id는 필수 입니다.');
+  }
+  if (!content || !content.trim()) {
+    return res.status(400).send('수정할 내용을 입력 하세요.');
+  }
+
+  const sql = `
+    UPDATE comment
+    SET content = ?
+    WHERE note_id = ? AND comment_id = ? AND user_id = ?
+  `;
+  db.query(sql, [content, noteID, commentID, userID], (err, result) => {
+    if (err) {
+      console.error('댓글 수정 실패:', err);
+      return res.status(500).send('댓글 수정 실패');
+    }
+    if (result.affectedRows === 0) {
+      return res.status(403).send('수정 권한이 없거나 댓글을 찾을 수 없습니다.');
+    }
+    res.status(200).send('댓글 수정 완료');
+  });
+});
+
+//댓글 삭제
+router.delete('/:noteID/comments/:commentID',(req,res)=>{
+  const {noteID,commentID} = req.params;
+  const { userID} = req.body;
+  if(!userId){
+    return res.status(400).send('user_id는 필수 입니다.');
+  }
+
+  const sql = `
+    DELETE FROM comment
+    WHERE note_id = ? AND comment_id = ? AND user_id = ?
+  `;
+
+  db.query(sql,[noteID,commentID,userID],(err,result)=>{
+    if(err){
+      console.error('댓글 삭제 실패:',err);
+      return res.status(500).send('댓글 삭제 실패');
+    }
+    if (result.affectedRows === 0) {
+      return res.status(403).send('수정 권한이 없거나 댓글을 찾을 수 없습니다.');
+    }
+    res.status(200).send('댓글 삭제 완료');
+  })
+})
+
 module.exports = router;

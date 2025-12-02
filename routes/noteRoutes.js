@@ -12,18 +12,87 @@ router.post('/:treeID/notes', (req, res) => {
     return res.status(400).send('user_id와 message는 필수입니다.');
   }
 
-  const sql = `
-    INSERT INTO note (tree_id, user_id, message, pos_x, pos_y)
-    VALUES (?, ?, ?, ?, ?)
-  `;
-  db.query(sql, [treeID, user_id, message, pos_x || 0, pos_y || 0], (err, result) => {
+  // const sql = `
+  //   INSERT INTO note (tree_id, user_id, message, pos_x, pos_y)
+  //   VALUES (?, ?, ?, ?, ?)
+  // `;
+  // db.query(sql, [treeID, user_id, message, pos_x || 0, pos_y || 0], (err, result) => {
+  //   if (err) {
+  //     console.error('메모 등록 실패:', err);
+  //     return res.status(500).send('메모 등록 실패');
+  //   }
+  //   res.status(200).json({
+  //     message: '메모 등록 성공',
+  //     note_id: result.insertId,
+  //   });
+  // });
+
+  db.getConnection((err, conn) => {
     if (err) {
-      console.error('메모 등록 실패:', err);
-      return res.status(500).send('메모 등록 실패');
+      console.error('DB 연결 실패:', err);
+      return res.status(500).send(`DB 연결 실패: ${err.message}`);
     }
-    res.status(200).json({
-      message: '메모 등록 성공',
-      note_id: result.insertId,
+
+    // 1. 트랜잭션 시작
+    conn.beginTransaction((err) => {
+      if (err) {
+        conn.release();
+        console.error('트랜잭션 시작 실패:', err);
+        return res.status(500).send(`트랜잭션 시작 실패: ${err.message}`);
+      }
+
+      // 2. 트리 잠그기 (FOR UPDATE)
+      const lockSql = 'SELECT tree_id FROM tree WHERE tree_id = ? FOR UPDATE';
+      conn.query(lockSql, [treeID], (err, rows) => { // treeID 사용!
+        if (err) {
+          return conn.rollback(() => {
+            conn.release();
+            res.status(500).send(`락 설정 실패: ${err.message}`);
+          });
+        }
+
+        // 3. 현재 개수 세기
+        const countSql = 'SELECT COUNT(*) AS count FROM note WHERE tree_id = ?';
+        conn.query(countSql, [treeID], (err, rows) => {
+          if (err) {
+            return conn.rollback(() => {
+              conn.release();
+              res.status(500).send(`개수 조회 실패: ${err.message}`);
+            });
+          }
+
+          if (rows[0].count >= 10) {
+            // 4. 10개 넘으면 롤백하고 거절
+            return conn.rollback(() => {
+              conn.release();
+              res.status(400).send('더 이상 장식을 추가할 수 없습니다! (최대 10개)');
+            });
+          }
+
+          // 5. 안전하면 INSERT
+          const insertSql = 'INSERT INTO note (tree_id, user_id, message, pos_x, pos_y) VALUES (?, ?, ?, ?, ?)';
+          conn.query(insertSql, [treeID, user_id, message, pos_x || 0, pos_y || 0], (err, result) => {
+            if (err) {
+              return conn.rollback(() => {
+                conn.release();
+                res.status(500).send(`메모 저장 실패: ${err.message}`);
+              });
+            }
+
+            // 6. 최종 커밋
+            conn.commit((err) => {
+              if (err) {
+                return conn.rollback(() => {
+                  conn.release();
+                  res.status(500).send(`커밋 실패: ${err.message}`);
+                });
+              }
+              conn.release(); // 커넥션 반납
+              res.status(200).json({ message: '성공', note_id: result.insertId });
+            });
+          });
+        });
+      });
     });
   });
 });
