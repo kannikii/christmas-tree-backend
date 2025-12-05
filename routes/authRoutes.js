@@ -10,6 +10,8 @@ const buildUserPayload = (user) => ({
   id: user.user_id,
   username: user.username,
   email: user.email,
+  is_admin: user.is_admin,
+  is_blocked: user.is_blocked,
 });
 
 router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
@@ -94,7 +96,13 @@ router.post('/login', (req, res) => {
 
     res.status(200).json({
       message: '로그인 성공',
-      user: { id: user.user_id, username: user.username, email: user.email },
+      user: {
+        id: user.user_id,
+        username: user.username,
+        email: user.email,
+        is_admin: user.is_admin,
+        is_blocked: user.is_blocked,
+      },
     });
   });
 });

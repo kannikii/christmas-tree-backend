@@ -12,6 +12,8 @@ const treeRoutes = require('./routes/treeRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const likeRoutes = require('./routes/likeRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const adminAuth = require('./middlewares/adminAuth');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -52,6 +54,7 @@ app.use('/', treeRoutes);
 app.use('/trees', noteRoutes);
 app.use('/notes', commentRoutes);
 app.use('/notes', likeRoutes);
+app.use('/admin', adminAuth, adminRoutes);
 
 app.listen(port, () => {
   console.log(`API Server running on port:${port}`);

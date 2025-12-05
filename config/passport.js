@@ -54,6 +54,8 @@ passport.use(new GoogleStrategy(
           user_id: insertResult.insertId,
           username,
           email,
+          is_admin: 0,
+          is_blocked: 0,
         };
         done(null, newUser);
       });

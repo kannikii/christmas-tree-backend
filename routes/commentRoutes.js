@@ -3,12 +3,22 @@ const db = require('../config/db');
 
 const router = express.Router();
 
+const checkAdmin = (userId, cb) => {
+  if (!userId) return cb(null, false);
+  const sql = 'SELECT is_admin FROM user WHERE user_id = ? LIMIT 1';
+  db.query(sql, [userId], (err, rows) => {
+    if (err) return cb(err);
+    if (!rows.length) return cb(null, false);
+    return cb(null, rows[0].is_admin === 1);
+  });
+};
+
 router.post('/:noteID/comments', (req, res) => {
   const { noteID } = req.params;
   const { user_id, content } = req.body;
 
   if (!user_id || !content) {
-    return res.status(401).send('userId와 content는 필수 입니다.');
+    return res.status(401).send('user_id와 content는 필수 입니다.');
   }
   const sql = `
     INSERT INTO comment (note_id, user_id, content)
@@ -28,24 +38,35 @@ router.post('/:noteID/comments', (req, res) => {
 
 router.get('/:noteID/comments', (req, res) => {
   const { noteID } = req.params;
-  const sql = `
-    SELECT 
-      c.comment_id,
-      c.content,
-      c.created_at,
-      u.user_id,
-      u.username AS author
-    FROM comment c
-    JOIN user u ON c.user_id = u.user_id
-    WHERE c.note_id = ?
-    ORDER BY c.created_at ASC
-  `;
-  db.query(sql, [noteID], (err, result) => {
-    if (err) {
-      console.error('댓글 조회 실패:', err);
-      return res.status(500).send('댓글 조회 실패');
+  const adminUserId = Number(req.query.admin_user_id);
+
+  checkAdmin(adminUserId, (adminErr, isAdmin) => {
+    if (adminErr) {
+      console.error('관리자 확인 실패:', adminErr);
+      return res.status(500).send('관리자 확인 실패');
     }
-    res.status(200).json(result);
+
+    const sql = `
+      SELECT 
+        c.comment_id,
+        c.content,
+        c.created_at,
+        c.is_hidden,
+        u.user_id,
+        u.username AS author
+      FROM comment c
+      JOIN user u ON c.user_id = u.user_id
+      WHERE c.note_id = ?
+      ${isAdmin ? '' : 'AND c.is_hidden = 0'}
+      ORDER BY c.created_at ASC
+    `;
+    db.query(sql, [noteID], (err, result) => {
+      if (err) {
+        console.error('댓글 조회 실패:', err);
+        return res.status(500).send('댓글 조회 실패');
+      }
+      res.status(200).json(result);
+    });
   });
 });
 
@@ -81,7 +102,7 @@ router.put('/:noteID/comments/:commentID', (req, res) => {
 router.delete('/:noteID/comments/:commentID',(req,res)=>{
   const {noteID,commentID} = req.params;
   const { userID} = req.body;
-  if(!userId){
+  if(!userID){
     return res.status(400).send('user_id는 필수 입니다.');
   }
 

@@ -3,6 +3,16 @@ const db = require('../config/db');
 
 const router = express.Router();
 
+const checkAdmin = (userId, cb) => {
+  if (!userId) return cb(null, false);
+  const sql = 'SELECT is_admin FROM user WHERE user_id = ? LIMIT 1';
+  db.query(sql, [userId], (err, rows) => {
+    if (err) return cb(err);
+    if (!rows.length) return cb(null, false);
+    return cb(null, rows[0].is_admin === 1);
+  });
+};
+
 //note 생성
 router.post('/:treeID/notes', (req, res) => {
   const { treeID } = req.params;
@@ -101,20 +111,30 @@ router.post('/:treeID/notes', (req, res) => {
 //note 조회
 router.get('/:treeID/notes', (req, res) => {
   const { treeID } = req.params;
-  const sql = `
-    SELECT n.note_id, n.message, n.pos_x, n.pos_y, n.created_at,
-           u.user_id, u.username AS author
-    FROM note n
-    JOIN user u ON n.user_id = u.user_id
-    WHERE n.tree_id = ?
-    ORDER BY n.created_at DESC
-  `;
-  db.query(sql, [treeID], (err, result) => {
-    if (err) {
-      console.error('메모 조회 실패:', err);
-      return res.status(500).send('메모 조회 실패');
+  const adminUserId = Number(req.query.admin_user_id);
+
+  checkAdmin(adminUserId, (adminErr, isAdmin) => {
+    if (adminErr) {
+      console.error('관리자 확인 실패:', adminErr);
+      return res.status(500).send('관리자 확인 실패');
     }
-    res.status(200).json(result);
+
+    const sql = `
+      SELECT n.note_id, n.message, n.pos_x, n.pos_y, n.created_at, n.is_hidden,
+             u.user_id, u.username AS author
+      FROM note n
+      JOIN user u ON n.user_id = u.user_id
+      WHERE n.tree_id = ?
+      ${isAdmin ? '' : 'AND n.is_hidden = 0'}
+      ORDER BY n.created_at DESC
+    `;
+    db.query(sql, [treeID], (err, result) => {
+      if (err) {
+        console.error('메모 조회 실패:', err);
+        return res.status(500).send('메모 조회 실패');
+      }
+      res.status(200).json(result);
+    });
   });
 });
 
