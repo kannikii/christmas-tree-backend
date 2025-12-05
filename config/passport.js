@@ -3,7 +3,7 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const db = require('./db');
 
 const selectUserById = (id, callback) => {
-  const sql = 'SELECT user_id, username, email FROM user WHERE user_id = ?';
+  const sql = 'SELECT user_id, username, email, is_admin, is_blocked FROM user WHERE user_id = ?';
   db.query(sql, [id], (err, results) => {
     if (err) return callback(err);
     if (results.length === 0) return callback(null, null);
