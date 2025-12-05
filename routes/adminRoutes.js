@@ -405,4 +405,23 @@ router.get('/users/:userID/comments', (req, res) => {
   });
 });
 
+/**
+ * 관리자 로그 조회
+ */
+router.get('/logs', (req, res) => {
+  const sql = `
+    SELECT admin_id, action, target_note, user_id, note_id, actiontime
+    FROM admin_log
+    ORDER BY actiontime DESC
+    LIMIT 200
+  `;
+  db.query(sql, (err, rows) => {
+    if (err) {
+      console.error('관리자 로그 조회 실패:', err);
+      return res.status(500).send('관리자 로그 조회 실패');
+    }
+    res.json(rows);
+  });
+});
+
 module.exports = router;
