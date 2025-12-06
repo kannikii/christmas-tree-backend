@@ -123,10 +123,10 @@ router.delete('/notes/:noteID', (req, res) => {
 
         const authorId = rows[0].user_id;
 
-        // 로그를 먼저 남기고 이후 삭제 (FK 제약 회피)
-        const logSql = 'INSERT IGNORE INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
-        conn.query(logSql, [adminId, 'DELETE_NOTE', noteID, authorId, noteID], (logErr) => {
-          if (logErr) return rollback(conn, res, 500, '로그 기록 실패', logErr);
+        // FK로 admin_log.target_note가 note를 참조하므로, 해당 로그를 먼저 지움
+        const deleteLogs = 'DELETE FROM admin_log WHERE target_note = ?';
+        conn.query(deleteLogs, [noteID], (logDelErr) => {
+          if (logDelErr) return rollback(conn, res, 500, '로그 정리 실패', logDelErr);
 
           // 순서: 좋아요 삭제 -> 댓글 삭제 -> 노트 삭제
           const deleteLikes = 'DELETE FROM like_note WHERE note_id = ?';
@@ -141,10 +141,11 @@ router.delete('/notes/:noteID', (req, res) => {
               conn.query(deleteNote, [noteID], (delErr) => {
                 if (delErr) return rollback(conn, res, 500, '노트 삭제 실패', delErr);
 
+                // 삭제 성공 후, admin_log에 남길 수 없으므로 메시지로만 전달
                 conn.commit((commitErr) => {
                   if (commitErr) return rollback(conn, res, 500, '커밋 실패');
                   conn.release();
-                  res.json({ message: '노트 삭제 완료' });
+                  res.json({ message: '노트 삭제 완료 (관련 로그는 삭제되었습니다)' });
                 });
               });
             });
