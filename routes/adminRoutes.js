@@ -122,14 +122,25 @@ router.delete('/notes/:noteID', (req, res) => {
         conn.query(logSql, [adminId, 'DELETE_NOTE', noteID, authorId, noteID], (logErr) => {
           if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
 
-          const deleteSql = 'DELETE FROM note WHERE note_id = ?';
-          conn.query(deleteSql, [noteID], (delErr) => {
-            if (delErr) return rollback(conn, res, 500, '노트 삭제 실패');
+          // 순서: 좋아요 삭제 -> 댓글 삭제 -> 노트 삭제
+          const deleteLikes = 'DELETE FROM like_note WHERE note_id = ?';
+          conn.query(deleteLikes, [noteID], (likeErr) => {
+            if (likeErr) return rollback(conn, res, 500, '좋아요 삭제 실패');
 
-            conn.commit((commitErr) => {
-              if (commitErr) return rollback(conn, res, 500, '커밋 실패');
-              conn.release();
-              res.json({ message: '노트 삭제 완료' });
+            const deleteComments = 'DELETE FROM comment WHERE note_id = ?';
+            conn.query(deleteComments, [noteID], (cmtErr) => {
+              if (cmtErr) return rollback(conn, res, 500, '댓글 삭제 실패');
+
+              const deleteNote = 'DELETE FROM note WHERE note_id = ?';
+              conn.query(deleteNote, [noteID], (delErr) => {
+                if (delErr) return rollback(conn, res, 500, '노트 삭제 실패');
+
+                conn.commit((commitErr) => {
+                  if (commitErr) return rollback(conn, res, 500, '커밋 실패');
+                  conn.release();
+                  res.json({ message: '노트 삭제 완료' });
+                });
+              });
             });
           });
         });
