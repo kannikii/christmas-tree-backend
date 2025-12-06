@@ -3,7 +3,10 @@ const db = require('../config/db');
 
 const router = express.Router();
 
-const rollback = (conn, res, status, message) => {
+const rollback = (conn, res, status, message, err) => {
+  if (err) {
+    console.error(message, err);
+  }
   conn.rollback(() => {
     conn.release();
     res.status(status).send(message);
@@ -16,6 +19,7 @@ const rollback = (conn, res, status, message) => {
 router.patch('/notes/:noteID/hide', (req, res) => {
   const noteID = Number(req.params.noteID);
   const adminId = req.adminUser?.user_id;
+  if (!adminId) return res.status(401).send('관리자 인증 필요');
 
   db.getConnection((err, conn) => {
     if (err) return res.status(500).send('DB 연결 실패');
@@ -28,15 +32,15 @@ router.patch('/notes/:noteID/hide', (req, res) => {
 
       const selectSql = 'SELECT note_id, user_id FROM note WHERE note_id = ? FOR UPDATE';
       conn.query(selectSql, [noteID], (selErr, rows) => {
-        if (selErr) return rollback(conn, res, 500, '노트 조회 실패');
+        if (selErr) return rollback(conn, res, 500, '노트 조회 실패', selErr);
         if (!rows.length) return rollback(conn, res, 404, '노트를 찾을 수 없습니다.');
 
         const authorId = rows[0].user_id;
         const hideSql = 'UPDATE note SET is_hidden = 1 WHERE note_id = ?';
         conn.query(hideSql, [noteID], (hideErr) => {
-          if (hideErr) return rollback(conn, res, 500, '노트 숨김 실패');
+          if (hideErr) return rollback(conn, res, 500, '노트 숨김 실패', hideErr);
 
-          const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+          const logSql = 'INSERT IGNORE INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
           conn.query(logSql, [adminId, 'HIDE_NOTE', noteID, authorId, noteID], (logErr) => {
             if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
 
@@ -58,6 +62,7 @@ router.patch('/notes/:noteID/hide', (req, res) => {
 router.patch('/notes/:noteID/show', (req, res) => {
   const noteID = Number(req.params.noteID);
   const adminId = req.adminUser?.user_id;
+  if (!adminId) return res.status(401).send('관리자 인증 필요');
 
   db.getConnection((err, conn) => {
     if (err) return res.status(500).send('DB 연결 실패');
@@ -70,15 +75,15 @@ router.patch('/notes/:noteID/show', (req, res) => {
 
       const selectSql = 'SELECT note_id, user_id FROM note WHERE note_id = ? FOR UPDATE';
       conn.query(selectSql, [noteID], (selErr, rows) => {
-        if (selErr) return rollback(conn, res, 500, '노트 조회 실패');
+        if (selErr) return rollback(conn, res, 500, '노트 조회 실패', selErr);
         if (!rows.length) return rollback(conn, res, 404, '노트를 찾을 수 없습니다.');
 
         const authorId = rows[0].user_id;
         const showSql = 'UPDATE note SET is_hidden = 0 WHERE note_id = ?';
         conn.query(showSql, [noteID], (updErr) => {
-          if (updErr) return rollback(conn, res, 500, '노트 표시 실패');
+          if (updErr) return rollback(conn, res, 500, '노트 표시 실패', updErr);
 
-          const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+          const logSql = 'INSERT IGNORE INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
           conn.query(logSql, [adminId, 'SHOW_NOTE', noteID, authorId, noteID], (logErr) => {
             if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
 
@@ -100,6 +105,7 @@ router.patch('/notes/:noteID/show', (req, res) => {
 router.delete('/notes/:noteID', (req, res) => {
   const noteID = Number(req.params.noteID);
   const adminId = req.adminUser?.user_id;
+  if (!adminId) return res.status(401).send('관리자 인증 필요');
 
   db.getConnection((err, conn) => {
     if (err) return res.status(500).send('DB 연결 실패');
@@ -112,28 +118,28 @@ router.delete('/notes/:noteID', (req, res) => {
 
       const selectSql = 'SELECT note_id, user_id FROM note WHERE note_id = ? FOR UPDATE';
       conn.query(selectSql, [noteID], (selErr, rows) => {
-        if (selErr) return rollback(conn, res, 500, '노트 조회 실패');
+        if (selErr) return rollback(conn, res, 500, '노트 조회 실패', selErr);
         if (!rows.length) return rollback(conn, res, 404, '노트를 찾을 수 없습니다.');
 
         const authorId = rows[0].user_id;
 
         // 로그를 먼저 남기고 이후 삭제 (FK 제약 회피)
-        const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+        const logSql = 'INSERT IGNORE INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
         conn.query(logSql, [adminId, 'DELETE_NOTE', noteID, authorId, noteID], (logErr) => {
-          if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
+          if (logErr) return rollback(conn, res, 500, '로그 기록 실패', logErr);
 
           // 순서: 좋아요 삭제 -> 댓글 삭제 -> 노트 삭제
           const deleteLikes = 'DELETE FROM like_note WHERE note_id = ?';
           conn.query(deleteLikes, [noteID], (likeErr) => {
-            if (likeErr) return rollback(conn, res, 500, '좋아요 삭제 실패');
+            if (likeErr) return rollback(conn, res, 500, '좋아요 삭제 실패', likeErr);
 
             const deleteComments = 'DELETE FROM comment WHERE note_id = ?';
             conn.query(deleteComments, [noteID], (cmtErr) => {
-              if (cmtErr) return rollback(conn, res, 500, '댓글 삭제 실패');
+              if (cmtErr) return rollback(conn, res, 500, '댓글 삭제 실패', cmtErr);
 
               const deleteNote = 'DELETE FROM note WHERE note_id = ?';
               conn.query(deleteNote, [noteID], (delErr) => {
-                if (delErr) return rollback(conn, res, 500, '노트 삭제 실패');
+                if (delErr) return rollback(conn, res, 500, '노트 삭제 실패', delErr);
 
                 conn.commit((commitErr) => {
                   if (commitErr) return rollback(conn, res, 500, '커밋 실패');
@@ -175,7 +181,7 @@ router.patch('/comments/:commentID/hide', (req, res) => {
         conn.query(hideSql, [commentID], (hideErr) => {
           if (hideErr) return rollback(conn, res, 500, '댓글 숨김 실패');
 
-          const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+          const logSql = 'INSERT IGNORE INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
           conn.query(logSql, [adminId, 'HIDE_COMMENT', noteId, authorId, commentID], (logErr) => {
             if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
 
@@ -217,7 +223,7 @@ router.patch('/comments/:commentID/show', (req, res) => {
         conn.query(showSql, [commentID], (updErr) => {
           if (updErr) return rollback(conn, res, 500, '댓글 표시 실패');
 
-          const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+          const logSql = 'INSERT IGNORE INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
           conn.query(logSql, [adminId, 'SHOW_COMMENT', noteId, authorId, commentID], (logErr) => {
             if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
 
@@ -257,7 +263,7 @@ router.delete('/comments/:commentID', (req, res) => {
         const { user_id: authorId, note_id: noteId } = rows[0];
 
         // 로그를 먼저 남기고 이후 삭제 (FK 제약 회피)
-        const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+        const logSql = 'INSERT IGNORE INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
         conn.query(logSql, [adminId, 'DELETE_COMMENT', noteId, authorId, commentID], (logErr) => {
           if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
 
@@ -302,7 +308,7 @@ router.patch('/users/:userID/block', (req, res) => {
         conn.query(blockSql, [targetUserId], (updErr) => {
           if (updErr) return rollback(conn, res, 500, '차단 실패');
 
-          const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+          const logSql = 'INSERT IGNORE INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
           // target_note/note_id는 NOT NULL이라 0으로 채움 (스키마 제약 때문)
           conn.query(logSql, [adminId, 'BLOCK_USER', 0, targetUserId, 0], (logErr) => {
             if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
@@ -344,7 +350,7 @@ router.patch('/users/:userID/unblock', (req, res) => {
         conn.query(unblockSql, [targetUserId], (updErr) => {
           if (updErr) return rollback(conn, res, 500, '차단 해제 실패');
 
-          const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+          const logSql = 'INSERT IGNORE INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
           conn.query(logSql, [adminId, 'UNBLOCK_USER', 0, targetUserId, 0], (logErr) => {
             if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
 
