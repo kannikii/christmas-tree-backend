@@ -116,13 +116,15 @@ router.delete('/notes/:noteID', (req, res) => {
         if (!rows.length) return rollback(conn, res, 404, '노트를 찾을 수 없습니다.');
 
         const authorId = rows[0].user_id;
-        const deleteSql = 'DELETE FROM note WHERE note_id = ?';
-        conn.query(deleteSql, [noteID], (delErr) => {
-          if (delErr) return rollback(conn, res, 500, '노트 삭제 실패');
 
-          const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
-          conn.query(logSql, [adminId, 'DELETE_NOTE', noteID, authorId, noteID], (logErr) => {
-            if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
+        // 로그를 먼저 남기고 이후 삭제 (FK 제약 회피)
+        const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+        conn.query(logSql, [adminId, 'DELETE_NOTE', noteID, authorId, noteID], (logErr) => {
+          if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
+
+          const deleteSql = 'DELETE FROM note WHERE note_id = ?';
+          conn.query(deleteSql, [noteID], (delErr) => {
+            if (delErr) return rollback(conn, res, 500, '노트 삭제 실패');
 
             conn.commit((commitErr) => {
               if (commitErr) return rollback(conn, res, 500, '커밋 실패');
@@ -242,13 +244,15 @@ router.delete('/comments/:commentID', (req, res) => {
         if (!rows.length) return rollback(conn, res, 404, '댓글을 찾을 수 없습니다.');
 
         const { user_id: authorId, note_id: noteId } = rows[0];
-        const deleteSql = 'DELETE FROM comment WHERE comment_id = ?';
-        conn.query(deleteSql, [commentID], (delErr) => {
-          if (delErr) return rollback(conn, res, 500, '댓글 삭제 실패');
 
-          const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
-          conn.query(logSql, [adminId, 'DELETE_COMMENT', noteId, authorId, commentID], (logErr) => {
-            if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
+        // 로그를 먼저 남기고 이후 삭제 (FK 제약 회피)
+        const logSql = 'INSERT INTO admin_log (admin_id, action, target_note, user_id, note_id) VALUES (?, ?, ?, ?, ?)';
+        conn.query(logSql, [adminId, 'DELETE_COMMENT', noteId, authorId, commentID], (logErr) => {
+          if (logErr) return rollback(conn, res, 500, '로그 기록 실패');
+
+          const deleteSql = 'DELETE FROM comment WHERE comment_id = ?';
+          conn.query(deleteSql, [commentID], (delErr) => {
+            if (delErr) return rollback(conn, res, 500, '댓글 삭제 실패');
 
             conn.commit((commitErr) => {
               if (commitErr) return rollback(conn, res, 500, '커밋 실패');
