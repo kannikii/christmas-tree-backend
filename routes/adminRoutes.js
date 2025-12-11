@@ -150,9 +150,7 @@ router.delete('/notes/:noteID', (req, res) => {
   });
 });
 
-/**
- * 댓글 숨김
- */
+//댓글 숨김
 router.patch('/comments/:commentID/hide', (req, res) => {
   const commentID = Number(req.params.commentID);
   const adminId = req.adminUser?.user_id;
