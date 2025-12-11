@@ -13,9 +13,7 @@ const rollback = (conn, res, status, message, err) => {
   });
 };
 
-/**
- * 노트 숨김
- */
+//노트 숨김
 router.patch('/notes/:noteID/hide', (req, res) => {
   const noteID = Number(req.params.noteID);
   const adminId = req.adminUser?.user_id;
@@ -56,9 +54,7 @@ router.patch('/notes/:noteID/hide', (req, res) => {
   });
 });
 
-/**
- * 노트 표시
- */
+//노트 표시
 router.patch('/notes/:noteID/show', (req, res) => {
   const noteID = Number(req.params.noteID);
   const adminId = req.adminUser?.user_id;
@@ -99,9 +95,7 @@ router.patch('/notes/:noteID/show', (req, res) => {
   });
 });
 
-/**
- * 노트 삭제 (복구 없음)
- */
+//노트 삭제
 router.delete('/notes/:noteID', (req, res) => {
   const noteID = Number(req.params.noteID);
   const adminId = req.adminUser?.user_id;
@@ -198,9 +192,7 @@ router.patch('/comments/:commentID/hide', (req, res) => {
   });
 });
 
-/**
- * 댓글 표시
- */
+//댓글 표시
 router.patch('/comments/:commentID/show', (req, res) => {
   const commentID = Number(req.params.commentID);
   const adminId = req.adminUser?.user_id;
@@ -240,9 +232,7 @@ router.patch('/comments/:commentID/show', (req, res) => {
   });
 });
 
-/**
- * 댓글 삭제 (복구 없음)
- */
+//댓글 삭제
 router.delete('/comments/:commentID', (req, res) => {
   const commentID = Number(req.params.commentID);
   const adminId = req.adminUser?.user_id;
@@ -284,9 +274,7 @@ router.delete('/comments/:commentID', (req, res) => {
   });
 });
 
-/**
- * 사용자 차단
- */
+//사용자 차단
 router.patch('/users/:userID/block', (req, res) => {
   const targetUserId = Number(req.params.userID);
   const adminId = req.adminUser?.user_id;
@@ -326,9 +314,7 @@ router.patch('/users/:userID/block', (req, res) => {
   });
 });
 
-/**
- * 사용자 차단 해제
- */
+//사용자 차단 해제
 router.patch('/users/:userID/unblock', (req, res) => {
   const targetUserId = Number(req.params.userID);
   const adminId = req.adminUser?.user_id;
@@ -367,9 +353,7 @@ router.patch('/users/:userID/unblock', (req, res) => {
   });
 });
 
-/**
- * 사용자 목록 조회 (관리자용)
- */
+//사용자 목록 조회(관리자용))
 router.get('/users', (req, res) => {
   const sql = `
     SELECT user_id, username, email, is_admin, is_blocked, created_at
@@ -385,9 +369,7 @@ router.get('/users', (req, res) => {
   });
 });
 
-/**
- * 특정 사용자의 노트 목록 (관리자용, 숨김 포함)
- */
+//특정 사용자의 노트 목록 (관리자용, 숨김 포함)
 router.get('/users/:userID/notes', (req, res) => {
   const userId = Number(req.params.userID);
   const sql = `
@@ -406,9 +388,7 @@ router.get('/users/:userID/notes', (req, res) => {
   });
 });
 
-/**
- * 특정 사용자의 댓글 목록 (관리자용, 숨김 포함)
- */
+//특정 사용자의 댓글 목록 (관리자용, 숨김 포함)
 router.get('/users/:userID/comments', (req, res) => {
   const userId = Number(req.params.userID);
   const sql = `
@@ -427,9 +407,7 @@ router.get('/users/:userID/comments', (req, res) => {
   });
 });
 
-/**
- * 관리자 로그 조회
- */
+//관리자 로그 조회
 router.get('/logs', (req, res) => {
   const sql = `
     SELECT admin_id, action, target_note, user_id, note_id, actiontime

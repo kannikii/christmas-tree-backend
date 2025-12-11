@@ -61,7 +61,6 @@ router.post('/:treeID/notes', (req, res) => {
           });
         }
         
-
         //현재 개수 세기
         const countSql = 'SELECT COUNT(*) AS count FROM note WHERE tree_id = ?';
         conn.query(countSql, [treeID], (err, rows) => {
